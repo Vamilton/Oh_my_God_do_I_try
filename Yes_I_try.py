@@ -12,6 +12,7 @@ from googleapiclient.discovery import build
 import io
 import urllib
 import urllib.request
+from PIL import Image
 
 with open('vk_token.txt', 'r') as file_object:
     vk_token = file_object.read().strip()
@@ -36,7 +37,7 @@ with open('famous-momentum-351512-1ba814e3d26c.json', 'r') as file_object:
 
 #-----------------------Загрузчики-------------------
 class YaUploader:
-    def __init__(self, token):
+    def __init__(self):
         self.ya_token = ya_token
         self.header = {
             'Content-Type': 'application/json',
@@ -57,15 +58,23 @@ class GoogleUploader:
             self.servise_account_file, scopes=self.SCOPES)
         self.service = build('drive', 'v3', credentials=self.credentials)
 
-    def goodle_upload(self):
+    def google_file_list(self):
+        file_list = []
+        results = self.service.files().list(pageSize=1000,
+                                       fields='files(name)').execute()
+        for names in results['files']:
+            file_list.append(names['name'])
+        return file_list
+
+    def goodle_upload(self, f_name):
         folder_id = '1vAKblfbfZYPJRT_9F0rsbiI1HB8GfDrg'
         url = "https://sun9-77.userapi.com/s/v1/if2/lPNZ9S6_0vfbK992z9e8LAur5qji-tiePWmm_SuTVgOnVjVukueY0jh0GtercEHRgK25O79xR77vOZjTZm8Oe7OF.jpg?size=1728x2160&quality=95&type=album"
         response = urllib.request.urlopen(url)
         fh = io.BytesIO(response.read())
         media_body = MediaIoBaseUpload(fh, mimetype='image/jpeg',
-                                       chunksize=1024 * 1024, resumable=True)
+                                       resumable=True)
         body = {
-            'title': 'pic.jpg',
+            'name': f_name,
             'parents': [folder_id]
         }
         r = self.service.files().create(body=body, media_body=media_body).execute()
@@ -73,10 +82,11 @@ class GoogleUploader:
 
 #-------------------Вконтакте--------------
 
-class VkPhotos(YaUploader):
+class VkPhotos(YaUploader, GoogleUploader):
 
     def __init__(self, name):
-        super().__init__(name)
+        GoogleUploader.__init__(self)
+        YaUploader.__init__(self)
         self.token = vk_token
 
     def _get_user_id(self, name):
@@ -88,6 +98,12 @@ class VkPhotos(YaUploader):
         }
         res = requests.get(URL, params=params)
         return (res.json()['response'][0]['id'])
+
+    def get_size(self, url):
+        foto_url = url
+        raw = requests.get(foto_url, stream=True).raw
+        size = sum(Image.open(raw).size)
+        return size
 
 
     def get_maxsize_photo(self, name):
@@ -113,13 +129,17 @@ class VkPhotos(YaUploader):
             date = datetime.fromtimestamp(photos['date']).strftime("%B_%d_%Y")
             for photo in photos['sizes']:
                 photo['likes'] = like
-                photo['size'] = photo['height'] + photo['width']
                 photo['date'] = date
+                if photo['height'] != 0:
+                    photo['size'] = photo['height'] + photo['width']
+                else:
+                    photo_size = self.get_size(photo['url'])
+                    photo['size'] = photo_size
                 f_photo = {key: photo[key] for key in photo if key not in ['height', 'width']}
                 photo_dict = {**photo_dict, **f_photo}
             photo_list.append([*photo_dict.values()])
-            photo_list.sort(key=lambda i: i[2], reverse=True)
-        return(photo_list)
+            photo_list.sort(key=lambda i: i[4], reverse=True)
+        return photo_list
 
 
     def vk_data(self, f_name, size):
@@ -141,10 +161,8 @@ class VkPhotos(YaUploader):
             for photo in photo_list[0:quantity]:
                 f_name = (f'{photo[2]}.jpg')
                 if f_name in names_list:
-                    disk_file_path = f'/vk_test/{photo[2]}{photo[4]}.jpg'
                     f_name = f'{photo[2]}_{photo[4]}.jpg'
-                else:
-                    disk_file_path = (f'/vk_test/{photo[2]}.jpg')
+                disk_file_path = f'/vk_test/{f_name}'
                 photo_url = photo[0]
                 self.ya_upload(disk_file_path, photo_url)
                 vk_response.append(self.vk_data(f_name, photo[1]))
@@ -155,17 +173,23 @@ class VkPhotos(YaUploader):
             for photo in photo_list:
                 f_name = (f'{photo[2]}.jpg')
                 if f_name in names_list:
-                    disk_file_path = f'/vk_test/{photo[2]}ddddd.jpg'
                     f_name = f'{photo[2]}_{date.today()}.jpg'
-
-                else:
-                    disk_file_path = (f'/vk_test/{photo[2]}.jpg')
+                disk_file_path = f'/vk_test/{f_name}'
                 names_list.append(f_name)
                 photo_url = photo[0]
                 self.ya_upload(disk_file_path, photo_url)
                 bar.next()
         self.vk_info(vk_response)
 
+    def upl_from_vk_to_ggl(self, quantity=5):
+        photo_list = self.get_maxsize_photo(name)
+        names_list = self.google_file_list()
+        bar = IncrementalBar('Загрузка фото с ВК', max=5)
+        for photo in photo_list[0:quantity]:
+            f_name = (f'{photo[2]}.jpg')
+            if f_name in names_list:
+                f_name = f'{photo[2]}_{date.today()}.jpg'
+            self.goodle_upload(f_name)
 
 
 #---------------Одноклассники----------------
@@ -225,8 +249,14 @@ class OkPhotos(YaUploader):
 
 
 if __name__ == '__main__':
-    # name = input('Введите id или как-называются-эти-буквы-вместо-id: ')
-    you = GoogleUploader()
-    you.goodle_upload()
+    name = input('Введите id или как-называются-эти-буквы-вместо-id: ')
+    you = VkPhotos(name)
+    you.get_maxsize_photo(name)
+
+    #
+    # foto_url = 'https://sun9-23.userapi.com/s/v1/if1/E-ihFAFp43t6rbaMc7MGrFSnJFcJmzVIsHDtmT0hdhgKhML5czi9Ar7IQIfUQKI.jpg?size=75x56&quality=96&t'
+    # raw = requests.get(foto_url, stream=True).raw
+    # size = Image.open(raw).size
+    # print(size)
 
 
