@@ -203,7 +203,7 @@ class VkPhotos(YaUploader, GoogleUploader):
 class OkPhotos(YaUploader):
 
     def __init__(self, name):
-        super().__init__(name)
+        YaUploader.__init__(self)
         self.access_token = ok_access_token
         self.application_key = ok_public_token
         self.application_secret_key = ok_private_token
@@ -232,36 +232,28 @@ class OkPhotos(YaUploader):
 
     def upl_from_ok_to_ya(self, name, quantity=5):
         ok_response = []
+        names_list = []
         photo_list = self.get_photo_likes(name)
-        if len(photo_list) >= quantity:
-            bar = IncrementalBar('Загрузка фото с ОК', max=5)
-            for photo in photo_list[0:quantity]:
-                f_name = (f'{photo[0]}.jpg')
-                disk_file_path = (f'/ok_test/{photo[0]}.jpg')
-                photo_url = photo[1]
-                self.ya_upload(disk_file_path, photo_url)
-                # ok_response.append(self.vk_data(f_name, photo[1]))
-                bar.next()
-        else:
-            bar = IncrementalBar('Загрузка фото с OK', max=len(photo_list))
-            for photo in photo_list:
-                f_name = (f'{photo[0]}.jpg')
-                disk_file_path = (f'/ok_test/{photo[0]}.jpg')
-                photo_url = photo[1]
-                self.ya_upload(disk_file_path, photo_url)
-                bar.next()
+        folder_name = f'Ok_{name}'
+        self.new_folder(folder_name)
+        if len(photo_list) < quantity:
+            quantity = len(photo_list)
+        bar = IncrementalBar('Загрузка фото с ОК на Яндекс', max=quantity)
+        for photo in photo_list[0:quantity]:
+            f_name = f'{photo[0]}.jpg'
+            if f_name in names_list:
+                f_name = f'{photo[0]}_nothing_can_be_done.jpg'
+            disk_file_path = (f'/{folder_name}/{photo[0]}.jpg')
+            photo_url = photo[1]
+            names_list.append(f_name)
+            self.ya_upload(disk_file_path, photo_url)
+        # ok_response.append(self.vk_data(f_name, photo[1]))
+            bar.next()
         # self.vk_info(vk_response)
 
 
 if __name__ == '__main__':
     name = input('Введите id или как-называются-эти-буквы-вместо-id: ')
-    you = VkPhotos(name)
-    you.upl_from_vk_to_ya(name, 6)
-
-    #
-    # foto_url = 'https://sun9-23.userapi.com/s/v1/if1/E-ihFAFp43t6rbaMc7MGrFSnJFcJmzVIsHDtmT0hdhgKhML5czi9Ar7IQIfUQKI.jpg?size=75x56&quality=96&t'
-    # raw = requests.get(foto_url, stream=True).raw
-    # size = Image.open(raw).size
-    # print(size)
-
+    you = OkPhotos(name)
+    you.upl_from_ok_to_ya(name)
 
