@@ -113,7 +113,7 @@ class VkPhotos(YaUploader, GoogleUploader):
     def get_size(self, url):
         foto_url = url
         raw = requests.get(foto_url, stream=True).raw
-        size = sum(Image.open(raw).size)
+        size = Image.open(raw).size
         return size
 
 
@@ -144,7 +144,7 @@ class VkPhotos(YaUploader, GoogleUploader):
                 if photo['height'] != 0:
                     photo['size'] = photo['height'] + photo['width']
                 else:
-                    photo['size'] = self.get_size(photo['url'])
+                    photo['size'] = sum(self.get_size(photo['url']))
                 f_photo = {key: photo[key] for key in photo if key not in ['height', 'width']}
                 photo_dict = {**photo_dict, **f_photo}
             photo_list.append([*photo_dict.values()])
@@ -226,8 +226,18 @@ class OkPhotos(YaUploader):
             response = self.ok.photos.getPhotoInfo(photo_id=id, scope='VALUABLE_ACCESS;PHOTO_CONTENT', session_secret_key='self.session_secret_key')
             likes_and_url.append([response.json()['photo']['like_count'], response.json()['photo']['pic640x480']])
         likes_and_url.sort(key=lambda i: i[0], reverse=True)
-        return(likes_and_url)
+        return likes_and_url
 
+
+    def ok_data(self, f_name, size):
+        ok_data = {}
+        ok_data['file_name'] = f_name
+        ok_data['size'] = size
+        return ok_data
+
+    def ok_info(self, ok_data):
+        with open("ok_on_ya_info.json", "w") as f:
+            json.dump(ok_data, f)
 
 
     def upl_from_ok_to_ya(self, name, quantity=5):
@@ -243,13 +253,14 @@ class OkPhotos(YaUploader):
             f_name = f'{photo[0]}.jpg'
             if f_name in names_list:
                 f_name = f'{photo[0]}_nothing_can_be_done.jpg'
-            disk_file_path = (f'/{folder_name}/{photo[0]}.jpg')
+            disk_file_path = (f'/{folder_name}/{f_name}')
             photo_url = photo[1]
             names_list.append(f_name)
             self.ya_upload(disk_file_path, photo_url)
-        # ok_response.append(self.vk_data(f_name, photo[1]))
+            size = VkPhotos.get_size(self, photo[1])
+            ok_response.append(self.ok_data(f_name, size))
             bar.next()
-        # self.vk_info(vk_response)
+        self.ok_info(ok_response)
 
 
 if __name__ == '__main__':
