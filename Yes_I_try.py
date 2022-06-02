@@ -6,43 +6,22 @@ from progress.bar import IncrementalBar
 from datetime import datetime
 import json
 from ok_api import OkApi
-from google.oauth2 import service_account
-from apiclient.http import MediaIoBaseUpload
-from googleapiclient.discovery import build
 import io
 import urllib
 import urllib.request
 from PIL import Image
+from files.Tokens import Tokens
 
-with open('vk_token.txt', 'r') as file_object:
-    vk_token = file_object.read().strip()
 
-with open('ya_token.txt', 'r') as file_object:
-    ya_token = file_object.read().strip()
-
-with open('OK_ACCESS_TOKEN.txt', 'r') as file_object:
-    ok_access_token = file_object.read().strip()
-
-with open('OK_APP_PUBLIC_TOKEN.txt', 'r') as file_object:
-    ok_public_token = file_object.read().strip()
-
-with open('OK_APP_PRIVATE_TOKEN.txt', 'r') as file_object:
-    ok_private_token = file_object.read().strip()
-
-with open('Session_secret_key.txt', 'r') as file_object:
-    session_secret_key = file_object.read().strip()
-
-with open('famous-momentum-351512-1ba814e3d26c.json', 'r') as file_object:
-    ggl_token = json.load(file_object)['private_key']
 
 #-----------------------Загрузчики-------------------
 class YaUploader:
     def __init__(self):
-        self.ya_token = ya_token
+        Tokens.__init__(self)
         self.header = {
             'Content-Type': 'application/json',
 
-            'Authorization': f'OAuth {ya_token}'
+            'Authorization': f'OAuth {Tokens.ya_token(self)}'
         }
 
     def new_folder(self, folder_name):
@@ -56,35 +35,33 @@ class YaUploader:
         response = requests.post('https://cloud-api.yandex.net/v1/disk/resources/upload', headers=self.header, params=param)
 
 #-------------------------
+
+#Токен брать тут: https://developers.google.com/oauthplayground/
+
 class GoogleUploader:
     def __init__(self):
-        self.SCOPES = ['https://www.googleapis.com/auth/drive']
-        self.servise_account_file = r'C:\Users\Блейз\Documents\Питонян\Домашки\Курсовое\famous-momentum-351512-1ba814e3d26c.json'
-        self.credentials = service_account.Credentials.from_service_account_file(
-            self.servise_account_file, scopes=self.SCOPES)
-        self.service = build('drive', 'v3', credentials=self.credentials)
+        Tokens.__init__(self)
 
-    # def google_file_list(self): ----Загадочная штука, получающая список файлов на диске. Зачем?----
-    #     file_list = []
-    #     results = self.service.files().list(pageSize=1000,
-    #                                    fields='files(name, parents)').execute()
-    #     pprint(results['files'])
-    #     for names in results['files']:
-    #         file_list.append(names['name'])
-        # pprint(file_list)
 
-    def goodle_upload(self, f_url, f_name):
-        folder_id = '1vAKblfbfZYPJRT_9F0rsbiI1HB8GfDrg'
-        response = urllib.request.urlopen(f_url)
-        fh = io.BytesIO(response.read())
-        media_body = MediaIoBaseUpload(fh, mimetype='image/jpeg',
-                                       resumable=True)
-        body = {
-            'name': f_name,
-            'parents': [folder_id]
+    def new_ggl_folder(self, folder_name):
+        token = Tokens.google_token(self)
+        url = 'https://www.googleapis.com/drive/v3/files'
+        headers = {
+            'Authorization': 'Bearer {}'.format(token),
+            'Content-Type': 'application/json'
         }
-        r = self.service.files().create(body=body, media_body=media_body).execute()
+        metadata = {
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        r = requests.post(url, headers=headers, data=json.dumps(metadata))
+        folder_id = r.json()['id']
+        return folder_id
 
+
+    def goodle_upload(self, f_url, f_name, folder_name):
+        token = Tokens.google_token(self)
+        folder_id = self.new_ggl_folder(token, folder_name)
 
 #-------------------Вконтакте--------------
 
@@ -93,13 +70,14 @@ class VkPhotos(YaUploader, GoogleUploader):
     def __init__(self, name):
         GoogleUploader.__init__(self)
         YaUploader.__init__(self)
-        self.token = vk_token
+        Tokens.__init__(self)
+
 
     def _get_user_id(self, name):
         URL = 'https://api.vk.com/method/users.get'
         params = {
             'user_ids': name,
-            'access_token': vk_token,
+            'access_token': Tokens.vk_token(self),
             'v': '5.131'
         }
         res = requests.get(URL, params=params)
@@ -108,7 +86,14 @@ class VkPhotos(YaUploader, GoogleUploader):
             name = input('Такого id не существует, введите нормальное: ')
             self._get_user_id(name)
         else:
-            return (res.json()['response'][0]['id'])
+            if 'can_access_closed' in res.json()['response'][0].keys() and not res.json()['response'][0]['can_access_closed']:
+                name = input('Профиль закрыт, выберите другой: ')
+                self._get_user_id(name)
+            elif 'deactivated' in res.json()['response'][0].keys():
+                name = input('Профиль неактивен, выберите другой: ')
+                self._get_user_id(name)
+            else:
+                return (res.json()['response'][0]['id'])
 
     def get_size(self, url):
         foto_url = url
@@ -122,7 +107,7 @@ class VkPhotos(YaUploader, GoogleUploader):
         user_id = self._get_user_id(name)
         params = {
             'user_ids': name,
-            'access_token': vk_token,
+            'access_token': Tokens.vk_token(self),
             'v':'5.131',
             'owner_id': user_id,
             'album_id': 'profile',
@@ -185,16 +170,18 @@ class VkPhotos(YaUploader, GoogleUploader):
             bar.next()
         self.vk_info(vk_response)
 
-    def upl_from_vk_to_ggl(self, quantity=5):
+    def upl_from_vk_to_ggl(self, name, quantity=5):
         photo_list = self.get_maxsize_photo(name)
-        names_list = self.google_file_list()
-        if len(photo_list) >= quantity:
+        names_list = []
+        folder_name = f'VK_{name}'
+        if len(photo_list) > quantity:
             bar = IncrementalBar('Загрузка фото с ВК на Гугл', max=quantity)
             for photo in photo_list[0:quantity]:
+                f_url = photo[0]
                 f_name = (f'{photo[2]}.jpg')
                 if f_name in names_list:
                     f_name = f'{photo[2]}_{date.today()}.jpg'
-                self.goodle_upload(f_name)
+                self.goodle_upload(f_url, f_name, folder_name)
 
 
 #---------------Одноклассники----------------
@@ -265,6 +252,6 @@ class OkPhotos(YaUploader):
 
 if __name__ == '__main__':
     name = input('Введите id или как-называются-эти-буквы-вместо-id: ')
-    you = OkPhotos(name)
-    you.upl_from_ok_to_ya(name)
+    you = VkPhotos(name)
+    you.upl_from_vk_to_ya(name)
 
