@@ -1,13 +1,3 @@
-import requests
-import os
-import time
-from pprint import pprint
-from progress.bar import IncrementalBar
-from datetime import datetime
-import json
-from ok_api import OkApi
-import io
-from PIL import Image
 import configparser
 from files.Vkontakte import VkPhotos
 from files.Ya_upload import YaUploader
@@ -31,7 +21,7 @@ def what_to_do():
 
     if command_to.lower() == 'яндекс':
         rec = YaUploader().upl_to_ya(photo_list)
-    if command_to.lower() == 'гугл':
+    elif command_to.lower() == 'гугл':
         print('Прости, я ещё так не умею')
 
 
