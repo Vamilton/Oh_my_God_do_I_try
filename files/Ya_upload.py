@@ -2,6 +2,7 @@ import configparser
 import requests
 from progress.bar import IncrementalBar
 import json
+import sys
 
 
 class YaUploader:
@@ -19,12 +20,16 @@ class YaUploader:
     def new_folder(self, folder_name):
         its_url = f'https://cloud-api.yandex.net/v1/disk/resources?path={folder_name}'
         response = requests.put(its_url, headers=self.header)
+        if response.status_code != 201:
+            sys.exit('Что-то пошло не так, давай сначала.')
         return response.json()
 
 
     def ya_upload(self, disk_file_path, photo_url):
         param = {'url': photo_url, 'overwrite': 'true', 'path': disk_file_path}
         response = requests.post('https://cloud-api.yandex.net/v1/disk/resources/upload', headers=self.header, params=param)
+        if response.status_code != 202:
+            sys.exit('Что-то пошло не так, давай сначала.')
 
     def rec_data(self, f_name, size):
         rec_data = {}
@@ -43,7 +48,7 @@ class YaUploader:
         self.new_folder(folder_name)
         if len(photo_list) < quantity:
             quantity = len(photo_list)
-        bar = IncrementalBar('Загрузка фото с ВК на Яндекс', max=quantity)
+        bar = IncrementalBar('Загрузка фото на Яндекс', max=quantity)
         for photo in photo_list[0:quantity]:
             f_name = (f'{photo[2]}.jpg')
             if f_name in names_list:

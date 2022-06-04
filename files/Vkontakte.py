@@ -2,18 +2,16 @@ import configparser
 import requests
 from datetime import datetime
 from PIL import Image
+import sys
 
 
 class VkPhotos:
-
 
     def __init__(self):
         self.path = 'settings.ini'
         self.config = configparser.ConfigParser()
         self.config.read(self.path)
         self.token = self.config.get("Tokens", "vk_token")
-
-
 
     def _get_user_id(self):
         flag = True
@@ -26,6 +24,8 @@ class VkPhotos:
                 'v': '5.131'
             }
             res = requests.get(URL, params=params)
+            if res.status_code != 200:
+                sys.exit('Что-то пошло не так, давай сначала.')
             if not bool(res.json()['response']):
                 print('Пользователь не существует')
                 flag = not bool(res.json()['response'])
@@ -39,14 +39,11 @@ class VkPhotos:
         user_id = res.json()['response'][0]['id']
         return user_id
 
-
-
     def get_size(self, url):
         foto_url = url
         raw = requests.get(foto_url, stream=True).raw
         size = Image.open(raw).size
         return size
-
 
     def get_maxsize_photo(self):
         URL = 'https://api.vk.com/method/photos.get'
