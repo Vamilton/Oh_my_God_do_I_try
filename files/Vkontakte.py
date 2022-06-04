@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from PIL import Image
 import sys
+from pprint import pprint
 
 
 class VkPhotos:
@@ -77,6 +78,7 @@ class VkPhotos:
                 photo_dict = {**photo_dict, **f_photo}
             photo_list.append([*photo_dict.values()])
             photo_list.sort(key=lambda i: i[4], reverse=True)
+        pprint(photo_list)
         return photo_list
 
 

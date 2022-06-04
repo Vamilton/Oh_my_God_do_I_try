@@ -52,7 +52,7 @@ class YaUploader:
         for photo in photo_list[0:quantity]:
             f_name = (f'{photo[2]}.jpg')
             if f_name in names_list:
-                f_name = f'{photo[2]}_{photo[4]}.jpg'
+                f_name = f'{photo[2]}_{photo[3]}.jpg'
             disk_file_path = f'/{folder_name}/{f_name}'
             photo_url = photo[0]
             self.ya_upload(disk_file_path, photo_url)
