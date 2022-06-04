@@ -26,8 +26,13 @@ def what_to_do():
         photo_list = VkPhotos().get_maxsize_photo()
     elif command_from.lower() == 'ok':
         photo_list = OkPhotos().get_album_photos()
+    else:
+        print('Прости, я больше ничего не умею')
+
     if command_to.lower() == 'яндекс':
         rec = YaUploader().upl_to_ya(photo_list)
+    if command_to.lower() == 'гугл':
+        print('Прости, я ещё так не умею')
 
 
 
