@@ -1,6 +1,7 @@
 import configparser
 import requests
 import json
+import sys
 from progress.bar import IncrementalBar
 from pprint import pprint
 
@@ -26,6 +27,8 @@ class GoogleUploader:
             'mimeType': 'application/vnd.google-apps.folder'
         }
         r = requests.post(url, headers=headers, data=json.dumps(metadata))
+        if r.status_code == 401:
+            sys.exit('Токен устарел, обнови и начни сначала.')
         folder_id = r.json()['id']
         return folder_id
 
