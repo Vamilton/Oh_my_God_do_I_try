@@ -17,12 +17,18 @@ class YaUploader:
             'Authorization': f'OAuth {self.token}'
         }
 
-    def new_folder(self, folder_name):
-        its_url = f'https://cloud-api.yandex.net/v1/disk/resources?path={folder_name}'
-        response = requests.put(its_url, headers=self.header)
+    def new_folder(self):
+        flag = True
+        while flag:
+            folder_name = input('Как назвать папку? ')
+            its_url = f'https://cloud-api.yandex.net/v1/disk/resources?path={folder_name}'
+            response = requests.put(its_url, headers=self.header)
+            flag = True if response.status_code == 409 else False
+            print('Такая папка существует') if flag == True else print('Ok')
         if response.status_code != 201:
+            print(response.status_code)
             sys.exit('Что-то пошло не так, давай сначала.')
-        return response.json()
+        return folder_name
 
 
     def ya_upload(self, disk_file_path, photo_url):
@@ -44,8 +50,7 @@ class YaUploader:
     def upl_to_ya(self, photo_list, quantity=5):
         names_list = []
         response = []
-        folder_name = input('Как назвать папку? ')
-        self.new_folder(folder_name)
+        folder_name = self.new_folder()
         if len(photo_list) < quantity:
             quantity = len(photo_list)
         bar = IncrementalBar('Загрузка фото на Яндекс', max=quantity)
