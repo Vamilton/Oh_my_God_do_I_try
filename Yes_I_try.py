@@ -3,6 +3,8 @@ from files.Vkontakte import VkPhotos
 from files.Ya_upload import YaUploader
 from files.Odnokl import OkPhotos
 from files.Google import GoogleUploader
+from files.Facebook import Facebook
+import urllib
 import requests
 
 def read_config():
@@ -12,7 +14,7 @@ def read_config():
     return config
 
 def what_to_do():
-    upl_from = ['вк', 'ок']
+    upl_from = ['вк', 'ок', 'фб']
     upl_to = ['яндекс', 'гугл']
     command_from = input('Откуда грузим? (Вк, Ок) ')
     while command_from not in upl_from:
@@ -24,6 +26,8 @@ def what_to_do():
         photo_list = VkPhotos().get_maxsize_photo()
     elif command_from.lower() == 'ок':
         photo_list = OkPhotos().get_album_photos()
+    elif command_from.lower() == 'фб':
+        photo_list = Facebook.get_maxsize_photo()
     else:
         print('Прости, я такое не умею')
     if command_to.lower() == 'яндекс':
@@ -37,5 +41,6 @@ def what_to_do():
 if __name__ == '__main__':
     config = read_config()
     what_to_do()
+
 
 
